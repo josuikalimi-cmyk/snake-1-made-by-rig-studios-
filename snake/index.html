@@ -1,0 +1,660 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NOKIA SNAKE II</title>
+
+<style>
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: #151a14;
+    color: #b8d49b;
+    font-family: monospace;
+}
+
+.phone {
+    width: min(95vw, 480px);
+    padding: 28px;
+    background: #303a2e;
+    border: 5px solid #59634f;
+    border-radius: 35px;
+    box-shadow: 0 15px 50px #000;
+}
+
+.brand {
+    text-align: center;
+    font-size: 27px;
+    font-weight: bold;
+    letter-spacing: 6px;
+    margin-bottom: 20px;
+    color: #c4d5b3;
+}
+
+.screen {
+    position: relative;
+    background: #9bbc65;
+    border: 8px solid #202820;
+    padding: 10px;
+    color: #263c20;
+}
+
+.info {
+    display: flex;
+    justify-content: space-between;
+    gap: 5px;
+    flex-wrap: wrap;
+    font-size: 13px;
+    font-weight: bold;
+    padding: 7px 3px;
+}
+
+.info span {
+    white-space: nowrap;
+}
+
+canvas {
+    width: 100%;
+    display: block;
+    image-rendering: pixelated;
+}
+
+button {
+    cursor: pointer;
+    font-family: monospace;
+    background: #283c20;
+    color: #b8d49b;
+    border: 2px solid #172717;
+    padding: 11px 15px;
+    font-size: 14px;
+    transition: .15s;
+}
+
+button:hover {
+    background: #496532;
+    transform: translateY(-2px);
+}
+
+button:disabled {
+    opacity: .5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.menu {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.menu button {
+    flex: 1;
+}
+
+.panel {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    background: #9bbc65;
+    padding: 15px;
+    overflow-y: auto;
+    display: none;
+}
+
+.panel h2 {
+    text-align: center;
+}
+
+.skin {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 2px solid #6d8748;
+    padding: 10px 0;
+    gap: 8px;
+}
+
+.preview {
+    width: 20px;
+    height: 20px;
+    display: inline-block;
+    border: 2px solid #263c20;
+    vertical-align: middle;
+    margin-right: 7px;
+}
+
+.full {
+    width: 100%;
+    margin-top: 12px;
+}
+
+#overlay {
+    position: absolute;
+    inset: 40px 10px 10px;
+    background: #9bbc65ed;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    z-index: 2;
+}
+
+#overlay h2 {
+    font-size: 27px;
+}
+
+#overlay p {
+    font-size: 13px;
+}
+
+.hint {
+    text-align: center;
+    color: #c0d0b5;
+    font-size: 12px;
+    margin-top: 18px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="phone">
+
+    <div class="brand">SNAKE</div>
+
+    <div class="screen">
+
+        <!-- SCORE ABOVE THE GAME -->
+        <div class="info">
+            <span>SCORE: <span id="score">0</span></span>
+            <span>BEST: <span id="best">0</span></span>
+            <span>COINS: <span id="coins">0</span> ◈</span>
+        </div>
+
+        <canvas id="game" width="320" height="320"></canvas>
+
+        <!-- MAIN MENU -->
+        <div id="overlay">
+            <h2>SNAKE I</h2>
+            <p>THE CLASSIC NOKIA GAME</p>
+            <button id="startButton">START GAME</button>
+        </div>
+
+        <!-- SHOP -->
+        <div class="panel" id="shop">
+            <h2>◈ SKIN SHOP ◈</h2>
+
+            <p style="text-align:center">
+                YOUR COINS: <span id="shopCoins">0</span>
+            </p>
+
+            <div id="skinList"></div>
+
+            <button class="full" onclick="closePanels()">
+                BACK TO GAME
+            </button>
+        </div>
+
+        <!-- STATISTICS -->
+        <div class="panel" id="stats">
+            <h2>STATISTICS</h2>
+
+            <p>HIGH SCORE: <span id="statBest">0</span></p>
+            <p>COINS: <span id="statCoins">0</span></p>
+            <p>SKINS OWNED: <span id="statSkins">0</span></p>
+            <p>ACTIVE SKIN: <span id="statSkin">CLASSIC</span></p>
+
+            <button class="full" onclick="closePanels()">
+                BACK
+            </button>
+        </div>
+
+    </div>
+
+    <div class="menu">
+        <button onclick="openShop()">SHOP</button>
+        <button onclick="openStats()">STATS</button>
+    </div>
+
+    <div class="hint">
+        ARROW KEYS ONLY<br><br>
+        ▲ UP &nbsp; ▼ DOWN<br>
+        ◀ LEFT &nbsp; ▶ RIGHT
+    </div>
+
+</div>
+
+<script>
+
+// =====================================
+// AUTOMATIC DATA STORAGE
+// =====================================
+
+const SAVE_KEY = "nokia_snake_save_v4";
+
+const defaultData = {
+    coins: 0,
+    best: 0,
+    owned: ["classic"],
+    equipped: "classic"
+};
+
+function loadData() {
+    try {
+        const saved = JSON.parse(localStorage.getItem(SAVE_KEY));
+
+        if (!saved || typeof saved !== "object") {
+            return {...defaultData};
+        }
+
+        return {
+            ...defaultData,
+            ...saved,
+            owned: Array.isArray(saved.owned)
+                ? saved.owned
+                : ["classic"]
+        };
+    } catch {
+        return {...defaultData};
+    }
+}
+
+let data = loadData();
+
+function saveData() {
+    try {
+        localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+    } catch (error) {
+        console.error("SAVE ERROR:", error);
+    }
+}
+
+// =====================================
+// SKINS
+// =====================================
+
+const skins = [
+    {id:"classic",name:"NOKIA GREEN",price:0,color:"#304b25"},
+    {id:"blue",name:"OCEAN BLUE",price:50,color:"#1767a0"},
+    {id:"red",name:"FIRE RED",price:100,color:"#b52c27"},
+    {id:"purple",name:"ROYAL PURPLE",price:150,color:"#753b9a"},
+    {id:"gold",name:"GOLDEN SNAKE",price:250,color:"#b58b16"},
+    {id:"pink",name:"PINK PIXEL",price:350,color:"#db599c"},
+    {id:"white",name:"ICE WHITE",price:500,color:"#eeeecc"},
+    {id:"black",name:"SHADOW",price:750,color:"#252525"}
+];
+
+function getSkin() {
+    return skins.find(s => s.id === data.equipped) || skins[0];
+}
+
+// =====================================
+// UI
+// =====================================
+
+function updateInfo() {
+    document.getElementById("score").textContent = score;
+    document.getElementById("best").textContent = data.best;
+    document.getElementById("coins").textContent = data.coins;
+    document.getElementById("shopCoins").textContent = data.coins;
+}
+
+function openShop() {
+    stopGame();
+    closePanels();
+
+    document.getElementById("shop").style.display = "block";
+    document.getElementById("overlay").style.display = "none";
+
+    renderShop();
+}
+
+function renderShop() {
+    const list = document.getElementById("skinList");
+    list.innerHTML = "";
+
+    skins.forEach(skin => {
+        const owned = data.owned.includes(skin.id);
+        const equipped = data.equipped === skin.id;
+
+        const row = document.createElement("div");
+        row.className = "skin";
+
+        const info = document.createElement("div");
+
+        const preview = document.createElement("span");
+        preview.className = "preview";
+        preview.style.background = skin.color;
+
+        const name = document.createElement("span");
+        name.textContent = skin.name;
+
+        const price = document.createElement("div");
+        price.textContent = skin.price === 0
+            ? "FREE"
+            : skin.price + " COINS";
+
+        info.append(preview, name, price);
+
+        const button = document.createElement("button");
+
+        if (equipped) {
+            button.textContent = "EQUIPPED";
+            button.disabled = true;
+        } else if (owned) {
+            button.textContent = "EQUIP";
+            button.onclick = () => equipSkin(skin.id);
+        } else {
+            button.textContent = "BUY";
+            button.onclick = () => buySkin(skin);
+        }
+
+        row.append(info, button);
+        list.appendChild(row);
+    });
+
+    updateInfo();
+}
+
+function buySkin(skin) {
+    if (data.owned.includes(skin.id)) return;
+
+    if (data.coins < skin.price) {
+        alert("NOT ENOUGH COINS!");
+        return;
+    }
+
+    data.coins -= skin.price;
+    data.owned.push(skin.id);
+    data.equipped = skin.id;
+
+    saveData();
+    renderShop();
+    draw();
+}
+
+function equipSkin(id) {
+    if (!data.owned.includes(id)) return;
+
+    data.equipped = id;
+
+    saveData();
+    renderShop();
+    draw();
+}
+
+function openStats() {
+    stopGame();
+    closePanels();
+
+    document.getElementById("stats").style.display = "block";
+    document.getElementById("overlay").style.display = "none";
+
+    document.getElementById("statBest").textContent = data.best;
+    document.getElementById("statCoins").textContent = data.coins;
+    document.getElementById("statSkins").textContent = data.owned.length;
+    document.getElementById("statSkin").textContent = getSkin().name;
+}
+
+function closePanels() {
+    document.getElementById("shop").style.display = "none";
+    document.getElementById("stats").style.display = "none";
+    document.getElementById("overlay").style.display = "flex";
+}
+
+// =====================================
+// SNAKE GAME
+// =====================================
+
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+const tile = 16;
+const tiles = 20;
+
+let snake;
+let food;
+let direction;
+let nextDirection;
+
+let score = 0;
+let speed = 140;
+let running = false;
+let timer = null;
+
+function resetGame() {
+    snake = [
+        {x:10,y:10},
+        {x:9,y:10},
+        {x:8,y:10}
+    ];
+
+    direction = {x:1,y:0};
+    nextDirection = {x:1,y:0};
+
+    score = 0;
+    speed = 140;
+
+    spawnFood();
+    updateInfo();
+    draw();
+}
+
+function spawnFood() {
+    do {
+        food = {
+            x: Math.floor(Math.random() * tiles),
+            y: Math.floor(Math.random() * tiles)
+        };
+    } while (
+        snake.some(p => p.x === food.x && p.y === food.y)
+    );
+}
+
+// =====================================
+// DRAW GAME - NO EYES!
+// =====================================
+
+function draw() {
+    ctx.fillStyle = "#9bbc65";
+    ctx.fillRect(0, 0, 320, 320);
+
+    // Pixel grid
+    ctx.strokeStyle = "rgba(35,55,25,0.10)";
+
+    for (let i = 0; i <= 320; i += tile) {
+        ctx.beginPath();
+        ctx.moveTo(i, 0);
+        ctx.lineTo(i, 320);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(0, i);
+        ctx.lineTo(320, i);
+        ctx.stroke();
+    }
+
+    // Food
+    ctx.fillStyle = "#263d20";
+    ctx.fillRect(
+        food.x * tile + 3,
+        food.y * tile + 3,
+        10,
+        10
+    );
+
+    // Snake without eyes
+    snake.forEach((part, index) => {
+        ctx.fillStyle = index === 0
+            ? "#172c17"
+            : getSkin().color;
+
+        ctx.fillRect(
+            part.x * tile + 1,
+            part.y * tile + 1,
+            tile - 2,
+            tile - 2
+        );
+    });
+}
+
+// =====================================
+// GAME LOOP
+// =====================================
+
+function startGame() {
+    if (running) return;
+
+    resetGame();
+
+    running = true;
+
+    document.getElementById("overlay").style.display = "none";
+
+    update();
+}
+
+function stopGame() {
+    running = false;
+    clearTimeout(timer);
+}
+
+function update() {
+    if (!running) return;
+
+    direction = nextDirection;
+
+    const head = {
+        x: snake[0].x + direction.x,
+        y: snake[0].y + direction.y
+    };
+
+    // Wall collision
+    if (
+        head.x < 0 ||
+        head.x >= tiles ||
+        head.y < 0 ||
+        head.y >= tiles
+    ) {
+        gameOver();
+        return;
+    }
+
+    const eating =
+        head.x === food.x &&
+        head.y === food.y;
+
+    const body = eating ? snake : snake.slice(0, -1);
+
+    // Snake collision
+    if (body.some(p => p.x === head.x && p.y === head.y)) {
+        gameOver();
+        return;
+    }
+
+    snake.unshift(head);
+
+    if (eating) {
+        // SCORE
+        score += 10;
+
+        // COINS
+        data.coins += 5;
+
+        // BEST SCORE
+        if (score > data.best) {
+            data.best = score;
+        }
+
+        speed = Math.max(55, speed - 3);
+
+        spawnFood();
+
+        saveData();
+    } else {
+        snake.pop();
+    }
+
+    updateInfo();
+    draw();
+
+    timer = setTimeout(update, speed);
+}
+
+// =====================================
+// GAME OVER
+// =====================================
+
+function gameOver() {
+    stopGame();
+
+    if (score > data.best) {
+        data.best = score;
+    }
+
+    saveData();
+    updateInfo();
+
+    document.getElementById("overlay").innerHTML = `
+        <h2>GAME OVER</h2>
+        <p>FINAL SCORE: ${score}</p>
+        <p>BEST SCORE: ${data.best}</p>
+        <button onclick="startGame()">PLAY AGAIN</button>
+        <button onclick="openShop()">VISIT SHOP</button>
+    `;
+
+    document.getElementById("overlay").style.display = "flex";
+}
+
+// =====================================
+// ARROW KEYS ONLY - PC
+// =====================================
+
+document.addEventListener("keydown", e => {
+    const keys = {
+        ArrowUp: {x:0,y:-1},
+        ArrowDown: {x:0,y:1},
+        ArrowLeft: {x:-1,y:0},
+        ArrowRight: {x:1,y:0}
+    };
+
+    if (!keys[e.key]) return;
+
+    e.preventDefault();
+
+    if (!running) return;
+
+    const next = keys[e.key];
+
+    // Prevent reverse direction
+    if (
+        next.x + direction.x === 0 &&
+        next.y + direction.y === 0
+    ) return;
+
+    nextDirection = next;
+});
+
+// =====================================
+// INITIALIZE
+// =====================================
+
+document.getElementById("startButton").onclick = startGame;
+
+resetGame();
+updateInfo();
+
+</script>
+
+</body>
+</html>
